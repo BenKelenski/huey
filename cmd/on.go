@@ -1,0 +1,29 @@
+package cmd
+
+import (
+	"fmt"
+	"github.com/spf13/cobra"
+)
+
+var onId string
+var onCmd = &cobra.Command{
+	Use:   "on",
+	Short: "Turn on a light",
+	Long:  "Turn on a light",
+	Args:  cobra.ExactArgs(0),
+	Run: func(cmd *cobra.Command, args []string) {
+		id, err := cmd.Flags().GetString("id")
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Printf("Turning ON light with ID: %s\n", id)
+
+		On(id)
+	},
+}
+
+func init() {
+	onCmd.Flags().StringVarP(&onId, "id", "i", "", "ID of the light")
+	rootCmd.AddCommand(onCmd)
+}

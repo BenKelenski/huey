@@ -20,7 +20,7 @@ type HueResponse struct {
 }
 
 type HueDevice struct {
-	ID          string          `json:"id"`
+	ID          string          `json:"offId"`
 	IDV1        string          `json:"id_v1,omitempty"`
 	Identify    json.RawMessage `json:"identify,omitempty"` // Empty objects → use RawMessage or `map[string]any`
 	Metadata    Metadata        `json:"metadata"`
@@ -55,16 +55,14 @@ type Light struct {
 	Id   string
 }
 
-func List() (result []Light) {
+func makeRequest(method string, url string, body []byte) *http.Response {
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 	}
 
-	url := fmt.Sprintf("https://%s/clip/v2/resource/device", os.Getenv("HUE_IP_ADDRESS"))
-
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
 
 	if err != nil {
 		fmt.Println("Error while creating request to hue-api-v2", err)
@@ -73,22 +71,31 @@ func List() (result []Light) {
 
 	req.Header.Add(HUE_APP_HEADER, os.Getenv("HUE_USERNAME"))
 
-	resp, err := client.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
-		fmt.Println("❗ Error fetching data:", err)
+		fmt.Printf("client: error making http request: %s\n", err)
 		os.Exit(1)
 	}
 
-	defer resp.Body.Close()
+	return res
+}
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		fmt.Printf("❗ Error: %s\n%s\n", resp.Status, body)
+func List() (result []Light) {
+
+	url := fmt.Sprintf("https://%s/clip/v2/resource/device", os.Getenv("HUE_IP_ADDRESS"))
+
+	res := makeRequest("GET", url, nil)
+
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(res.Body)
+		fmt.Printf("❗ Error: %s\n%s\n", res.Status, body)
 		os.Exit(1)
 	}
 
 	var response HueResponse
-	err = json.NewDecoder(resp.Body).Decode(&response)
+	err := json.NewDecoder(res.Body).Decode(&response)
 	if err != nil {
 		fmt.Println("❗ Error decoding JSON:", err)
 		os.Exit(1)
@@ -105,6 +112,40 @@ func List() (result []Light) {
 	}
 
 	return lights
+}
+
+func Off(id string) {
+
+	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), id)
+
+	body := []byte(`{"on":{"on":false}}`)
+
+	res := makeRequest("PUT", url, body)
+
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(res.Body)
+		fmt.Printf("❗ Error: %s\n%s\n", res.Status, body)
+		os.Exit(1)
+	}
+}
+
+func On(id string) {
+
+	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), id)
+
+	body := []byte(`{"on":{"on":true}}`)
+
+	res := makeRequest("PUT", url, body)
+
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(res.Body)
+		fmt.Printf("❗ Error: %s\n%s\n", res.Status, body)
+		os.Exit(1)
+	}
 }
 
 func Register() {
