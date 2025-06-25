@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	"os"
 )
 
 var onId string
@@ -25,5 +26,10 @@ var onCmd = &cobra.Command{
 
 func init() {
 	onCmd.Flags().StringVarP(&onId, "id", "i", "", "ID of the light")
+	err := onCmd.MarkFlagRequired("id")
+	if err != nil {
+		fmt.Printf("Error marking flag as required: %s\n", err)
+		os.Exit(1)
+	}
 	rootCmd.AddCommand(onCmd)
 }

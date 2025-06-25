@@ -80,6 +80,23 @@ func makeRequest(method string, url string, body []byte) *http.Response {
 	return res
 }
 
+func Color(lightId string, color string) {
+
+	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), lightId)
+
+	body := []byte(`{"on":{"on":true},"xy":[` + color + `]}`)
+
+	res := makeRequest("PUT", url, body)
+
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(res.Body)
+		fmt.Printf("❗ Error: %s\n%s\n", res.Status, body)
+		os.Exit(1)
+	}
+}
+
 func List() (result []Light) {
 
 	url := fmt.Sprintf("https://%s/clip/v2/resource/device", os.Getenv("HUE_IP_ADDRESS"))
@@ -114,9 +131,9 @@ func List() (result []Light) {
 	return lights
 }
 
-func Off(id string) {
+func Off(lightId string) {
 
-	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), id)
+	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), lightId)
 
 	body := []byte(`{"on":{"on":false}}`)
 
@@ -131,9 +148,9 @@ func Off(id string) {
 	}
 }
 
-func On(id string) {
+func On(lightId string) {
 
-	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), id)
+	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), lightId)
 
 	body := []byte(`{"on":{"on":true}}`)
 
