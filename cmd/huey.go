@@ -97,7 +97,7 @@ func Color(lightId string, color string) {
 	}
 }
 
-func List() (result []Light) {
+func Devices() (result []Light) {
 
 	url := fmt.Sprintf("https://%s/clip/v2/resource/device", os.Getenv("HUE_IP_ADDRESS"))
 
