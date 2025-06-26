@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 )
 
 const (
@@ -55,6 +56,24 @@ type Light struct {
 	Id   string
 }
 
+type HueRequest struct {
+	On    OnState    `json:"on,omitempty"`
+	Color ColorState `json:"color,omitempty"`
+}
+
+type OnState struct {
+	On bool `json:"on"`
+}
+
+type ColorState struct {
+	XY XYState `json:"xy"`
+}
+
+type XYState struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
 func makeRequest(method string, url string, body []byte) *http.Response {
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -63,6 +82,7 @@ func makeRequest(method string, url string, body []byte) *http.Response {
 	}
 
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
 
 	if err != nil {
 		fmt.Println("Error while creating request to hue-api-v2", err)
@@ -81,12 +101,49 @@ func makeRequest(method string, url string, body []byte) *http.Response {
 }
 
 func Color(lightId string, color string) {
+	var x float64
+	var y float64
+
+	switch strings.ToLower(color) {
+
+	case "red":
+		x = 0.6718
+		y = 0.3195
+	case "green":
+		x = 0.2425
+		y = 0.6561
+	case "blue":
+		x = 0.0971
+		y = 0.1225
+	case "magenta":
+		x = 0.4143
+		y = 0.2038
+	case "purple":
+		x = 0.1315
+		y = 0.0813
+	case "orange":
+		x = 0.5654
+		y = 0.3962
+	case "yellow":
+		x = 0.4394
+		y = 0.5359
+	default:
+		fmt.Printf("No color coordinates found for %s\n", color)
+		return
+	}
 
 	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), lightId)
 
-	body := []byte(`{"on":{"on":true},"xy":[` + color + `]}`)
+	body := HueRequest{On: OnState{On: true}, Color: ColorState{XY: XYState{X: x, Y: y}}}
 
-	res := makeRequest("PUT", url, body)
+	jsonBody, err := json.Marshal(body)
+
+	if err != nil {
+		fmt.Println("Error marshalling json for request to hue-api-v2", err)
+		os.Exit(1)
+	}
+
+	res := makeRequest("PUT", url, jsonBody)
 
 	defer res.Body.Close()
 

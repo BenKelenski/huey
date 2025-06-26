@@ -7,17 +7,13 @@ import (
 )
 
 var colorId string
-var redValue float64
-var greenValue float64
-var blueValue float64
 var colorCmd = &cobra.Command{
 	Use:   "color",
 	Short: "Set the color of a light",
 	Long:  "Set the color of a light",
-	Args:  cobra.ExactArgs(0),
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-
-		fmt.Println("Changing light to color: ", colorId)
+		Color(colorId, args[0])
 	},
 }
 
