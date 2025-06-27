@@ -12,8 +12,8 @@ var colorCmd = &cobra.Command{
 	Short: "Set the color of a light",
 	Long:  "Set the color of a light",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		Color(colorId, args[0])
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return Color(colorId, args[0])
 	},
 }
 

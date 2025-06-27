@@ -11,17 +11,21 @@ var rootCmd = &cobra.Command{
 	Use:   "Huey",
 	Short: "Get all Hue devices",
 	Long:  "Get all Hue devices connected to the Hue bridge",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		reset := "\033[0m"
 		red := "\033[31m"
 		green := "\033[32m"
 		cyan := "\033[36m"
 
-		lights := Devices()
+		lights, err := Devices()
+
+		if err != nil {
+			return err
+		}
 
 		if len(lights) == 0 {
 			fmt.Printf(red + "❗ NO LIGHTS FOUND ❗\n" + reset)
-			return
+			return nil
 		}
 
 		sort.Slice(lights, func(i, j int) bool {
@@ -31,6 +35,8 @@ var rootCmd = &cobra.Command{
 		for i, light := range lights {
 			fmt.Printf("%s #%d %s- %s, %s, %s %s %s\n", green, i, reset, light.Name, light.Type, cyan, light.Id, reset)
 		}
+
+		return nil
 	},
 }
 

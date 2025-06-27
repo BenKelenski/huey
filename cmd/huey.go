@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"Huey/models"
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
@@ -12,69 +13,10 @@ import (
 )
 
 const (
-	HUE_APP_HEADER = "hue-application-key"
+	HueAppHeader = "hue-application-key"
 )
 
-type HueResponse struct {
-	Data   []HueDevice `json:"data"`
-	Errors []any       `json:"errors"` // or define properly if you care about errors
-}
-
-type HueDevice struct {
-	ID          string          `json:"offId"`
-	IDV1        string          `json:"id_v1,omitempty"`
-	Identify    json.RawMessage `json:"identify,omitempty"` // Empty objects → use RawMessage or `map[string]any`
-	Metadata    Metadata        `json:"metadata"`
-	ProductData ProductData     `json:"product_data"`
-	Services    []Service       `json:"services"`
-	Type        string          `json:"type"`
-}
-
-type Metadata struct {
-	Archetype string `json:"archetype"`
-	Name      string `json:"name"`
-}
-
-type ProductData struct {
-	Certified            bool   `json:"certified"`
-	HardwarePlatformType string `json:"hardware_platform_type,omitempty"`
-	ManufacturerName     string `json:"manufacturer_name"`
-	ModelID              string `json:"model_id"`
-	ProductArchetype     string `json:"product_archetype"`
-	ProductName          string `json:"product_name"`
-	SoftwareVersion      string `json:"software_version"`
-}
-
-type Service struct {
-	RID   string `json:"rid"`
-	RType string `json:"rtype"`
-}
-
-type Light struct {
-	Name string
-	Type string
-	Id   string
-}
-
-type HueRequest struct {
-	On    OnState    `json:"on,omitempty"`
-	Color ColorState `json:"color,omitempty"`
-}
-
-type OnState struct {
-	On bool `json:"on"`
-}
-
-type ColorState struct {
-	XY XYState `json:"xy"`
-}
-
-type XYState struct {
-	X float64 `json:"x"`
-	Y float64 `json:"y"`
-}
-
-func makeRequest(method string, url string, body []byte) *http.Response {
+func makeRequest(method string, url string, body []byte) (response *http.Response, e error) {
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -83,24 +25,22 @@ func makeRequest(method string, url string, body []byte) *http.Response {
 
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(HueAppHeader, os.Getenv("HUE_USERNAME"))
 
 	if err != nil {
-		fmt.Println("Error while creating request to hue-api-v2", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("error while creating request to hue-api-v2: %s\n", err)
 	}
-
-	req.Header.Add(HUE_APP_HEADER, os.Getenv("HUE_USERNAME"))
 
 	res, err := client.Do(req)
+
 	if err != nil {
-		fmt.Printf("client: error making http request: %s\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("client error sending http request: %s\n", err)
 	}
 
-	return res
+	return res, nil
 }
 
-func Color(lightId string, color string) {
+func Color(lightId string, color string) (e error) {
 	var x float64
 	var y float64
 
@@ -129,128 +69,152 @@ func Color(lightId string, color string) {
 		y = 0.5359
 	default:
 		fmt.Printf("No color coordinates found for %s\n", color)
-		return
+		return nil
 	}
 
 	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), lightId)
 
-	body := HueRequest{On: OnState{On: true}, Color: ColorState{XY: XYState{X: x, Y: y}}}
+	body := models.HueRequest{On: &models.OnState{On: true}, Color: &models.ColorState{XY: models.XYState{X: x, Y: y}}}
 
 	jsonBody, err := json.Marshal(body)
 
 	if err != nil {
-		fmt.Println("Error marshalling json for request to hue-api-v2", err)
-		os.Exit(1)
+		return fmt.Errorf("error marshalling json for request: %s\n", err)
 	}
 
-	res := makeRequest("PUT", url, jsonBody)
+	res, err := makeRequest("PUT", url, jsonBody)
+
+	if err != nil {
+		return err
+	}
 
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
-		fmt.Printf("❗ Error: %s\n%s\n", res.Status, body)
-		os.Exit(1)
+		return fmt.Errorf("error: %s\n%s\n", res.Status, body)
 	}
+	return nil
 }
 
-func Devices() (result []Light) {
+func Devices() (result []models.Light, e error) {
 
 	url := fmt.Sprintf("https://%s/clip/v2/resource/device", os.Getenv("HUE_IP_ADDRESS"))
 
-	res := makeRequest("GET", url, nil)
+	res, err := makeRequest("GET", url, nil)
+
+	if err != nil {
+		return nil, err
+	}
 
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
-		fmt.Printf("❗ Error: %s\n%s\n", res.Status, body)
-		os.Exit(1)
+		return nil, fmt.Errorf("error: %s\n%s\n", res.Status, body)
 	}
 
-	var response HueResponse
-	err := json.NewDecoder(res.Body).Decode(&response)
+	var response models.DevicesResponse
+	err = json.NewDecoder(res.Body).Decode(&response)
 	if err != nil {
-		fmt.Println("❗ Error decoding JSON:", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("error decoding JSON: %s\n", err)
 	}
 
-	var lights []Light
+	var lights []models.Light
 
 	for _, device := range response.Data {
 		for _, service := range device.Services {
 			if service.RType == "light" {
-				lights = append(lights, Light{device.Metadata.Name, device.Metadata.Archetype, service.RID})
+				lights = append(lights, models.Light{Name: device.Metadata.Name, Type: device.Metadata.Archetype, Id: service.RID})
 			}
 		}
 	}
 
-	return lights
+	return lights, nil
 }
 
-func Off(lightId string) {
+func Dim(lightId string, brightness float64) error {
+
+	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), lightId)
+
+	body := models.HueRequest{On: &models.OnState{On: true}, Dimming: &models.DimmingState{Brightness: brightness}}
+
+	jsonBody, err := json.Marshal(body)
+
+	if err != nil {
+		return fmt.Errorf("Error marshalling json for request to hue-api-v2", err)
+	}
+
+	res, err := makeRequest("PUT", url, jsonBody)
+
+	if err != nil {
+		return err
+	}
+
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("❗ Error: %s\n%s\n", res.Status, body)
+	}
+	return nil
+}
+
+func Off(lightId string) error {
 
 	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), lightId)
 
 	body := []byte(`{"on":{"on":false}}`)
 
-	res := makeRequest("PUT", url, body)
+	res, err := makeRequest("PUT", url, body)
+
+	if err != nil {
+		return err
+	}
 
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
-		fmt.Printf("❗ Error: %s\n%s\n", res.Status, body)
-		os.Exit(1)
+		return fmt.Errorf("❗ Error: %s\n%s\n", res.Status, body)
 	}
+
+	return nil
 }
 
-func On(lightId string) {
+func On(lightId string) (e error) {
 
 	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), lightId)
 
 	body := []byte(`{"on":{"on":true}}`)
 
-	res := makeRequest("PUT", url, body)
+	res, err := makeRequest("PUT", url, body)
+
+	if err != nil {
+		return err
+	}
 
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(res.Body)
-		fmt.Printf("❗ Error: %s\n%s\n", res.Status, body)
-		os.Exit(1)
+		return fmt.Errorf("error: %s\n%s\n", res.Status, body)
 	}
+
+	return nil
 }
 
-func Register() {
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
+func Register() (response []byte, e error) {
 
 	url := fmt.Sprintf("https://%s/api", os.Getenv("HUE_IP_ADDRESS"))
 
 	body := []byte(`{"devicetype": "huey#go_cli","generateclientkey": true}`)
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	res, err := makeRequest("POST", url, body)
 
 	if err != nil {
-		fmt.Println("Error while creating request to hue-api-v2", err)
-		os.Exit(1)
+		return nil, err
 	}
 
-	res, err := client.Do(req)
-	if err != nil {
-		fmt.Printf("client: error making http request: %s\n", err)
-		os.Exit(1)
-	}
-
-	resBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		fmt.Printf("client: could not read response body: %s\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("client: response body - %s", resBody)
+	return io.ReadAll(res.Body)
 }

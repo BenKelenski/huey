@@ -12,15 +12,15 @@ var onCmd = &cobra.Command{
 	Short: "Turn on a light",
 	Long:  "Turn on a light",
 	Args:  cobra.ExactArgs(0),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		id, err := cmd.Flags().GetString("id")
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		fmt.Printf("Turning ON light with ID: %s\n", id)
 
-		On(id)
+		return On(id)
 	},
 }
 
