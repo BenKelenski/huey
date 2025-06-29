@@ -13,7 +13,9 @@ import (
 )
 
 const (
-	HueAppHeader = "hue-application-key"
+	HueAppHeader    = "hue-application-key"
+	ContentType     = "Content-Type"
+	ApplicationJson = "application/json"
 )
 
 func makeRequest(method string, url string, body []byte) (response *http.Response, e error) {
@@ -24,7 +26,7 @@ func makeRequest(method string, url string, body []byte) (response *http.Respons
 	}
 
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(ContentType, ApplicationJson)
 	req.Header.Set(HueAppHeader, os.Getenv("HUE_USERNAME"))
 
 	if err != nil {
@@ -97,9 +99,15 @@ func Color(lightId string, color string) (e error) {
 	return nil
 }
 
-func Devices() (result []models.Light, e error) {
+func Devices(roomsFlag bool) (result []models.Device, e error) {
 
-	url := fmt.Sprintf("https://%s/clip/v2/resource/device", os.Getenv("HUE_IP_ADDRESS"))
+	var url string
+
+	if roomsFlag {
+		url = fmt.Sprintf("https://%s/clip/v2/resource/room", os.Getenv("HUE_IP_ADDRESS"))
+	} else {
+		url = fmt.Sprintf("https://%s/clip/v2/resource/device", os.Getenv("HUE_IP_ADDRESS"))
+	}
 
 	res, err := makeRequest("GET", url, nil)
 
@@ -120,20 +128,20 @@ func Devices() (result []models.Light, e error) {
 		return nil, fmt.Errorf("error decoding JSON: %s\n", err)
 	}
 
-	var lights []models.Light
+	var devices []models.Device
 
 	for _, device := range response.Data {
 		for _, service := range *device.Services {
-			if service.RType == "light" {
-				lights = append(lights, models.Light{Name: device.Metadata.Name, Type: device.Metadata.Archetype, Id: service.RID})
+			if (roomsFlag && service.RType == "grouped_light") || service.RType == "light" {
+				devices = append(devices, models.Device{Name: device.Metadata.Name, Type: device.Metadata.Archetype, Id: service.RID})
 			}
 		}
 	}
 
-	return lights, nil
+	return devices, nil
 }
 
-func Dim(lightId string, brightness float64) error {
+func Dim(lightId string, brightness float64) (e error) {
 
 	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), lightId)
 
@@ -142,7 +150,7 @@ func Dim(lightId string, brightness float64) error {
 	jsonBody, err := json.Marshal(body)
 
 	if err != nil {
-		return fmt.Errorf("Error marshalling json for request to hue-api-v2", err)
+		return fmt.Errorf("error marshalling json for request to hue-api-v2 %s", err)
 	}
 
 	res, err := makeRequest("PUT", url, jsonBody)
@@ -160,7 +168,7 @@ func Dim(lightId string, brightness float64) error {
 	return nil
 }
 
-func Off(lightId string) error {
+func Off(lightId string) (e error) {
 
 	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), lightId)
 

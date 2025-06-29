@@ -1,6 +1,6 @@
 package models
 
-type Light struct {
+type Device struct {
 	Name string
 	Type string
 	Id   string
