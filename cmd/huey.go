@@ -74,7 +74,7 @@ func Color(lightId string, color string) (e error) {
 
 	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), lightId)
 
-	body := models.HueRequest{On: &models.OnState{On: true}, Color: &models.ColorState{XY: models.XYState{X: x, Y: y}}}
+	body := models.HueDevice{On: &models.OnState{On: true}, Color: &models.ColorState{XY: models.XYState{X: x, Y: y}}}
 
 	jsonBody, err := json.Marshal(body)
 
@@ -114,7 +114,7 @@ func Devices() (result []models.Light, e error) {
 		return nil, fmt.Errorf("error: %s\n%s\n", res.Status, body)
 	}
 
-	var response models.DevicesResponse
+	var response models.HueData
 	err = json.NewDecoder(res.Body).Decode(&response)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding JSON: %s\n", err)
@@ -123,7 +123,7 @@ func Devices() (result []models.Light, e error) {
 	var lights []models.Light
 
 	for _, device := range response.Data {
-		for _, service := range device.Services {
+		for _, service := range *device.Services {
 			if service.RType == "light" {
 				lights = append(lights, models.Light{Name: device.Metadata.Name, Type: device.Metadata.Archetype, Id: service.RID})
 			}
@@ -137,7 +137,7 @@ func Dim(lightId string, brightness float64) error {
 
 	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), lightId)
 
-	body := models.HueRequest{On: &models.OnState{On: true}, Dimming: &models.DimmingState{Brightness: brightness}}
+	body := models.HueDevice{On: &models.OnState{On: true}, Dimming: &models.DimmingState{Brightness: brightness}}
 
 	jsonBody, err := json.Marshal(body)
 
