@@ -3,33 +3,37 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-	"os"
 )
 
-var offId string
+var (
+	offLightId string
+	offRoomId  string
+)
+
 var offCmd = &cobra.Command{
 	Use:   "off",
-	Short: "Turn off a light",
-	Long:  "Turn off a light",
+	Short: "Turn off a light or room",
+	Long:  "Turn off a light or room",
 	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		id, err := cmd.Flags().GetString("id")
-		if err != nil {
-			return err
+
+		if offLightId == "" && offRoomId == "" {
+			return fmt.Errorf("must specify either a light or room")
 		}
 
-		fmt.Printf("Turning OFF light with ID: %s\n", id)
+		if offLightId != "" {
+			return Off(offLightId, false)
+		} else {
+			return Off(offRoomId, true)
+		}
 
-		return Off(id)
 	},
 }
 
 func init() {
-	offCmd.Flags().StringVarP(&offId, "id", "i", "", "ID of the light")
-	err := offCmd.MarkFlagRequired("id")
-	if err != nil {
-		fmt.Printf("Error marking flag as required: %s\n", err)
-		os.Exit(1)
-	}
+	offCmd.Flags().StringVarP(&offLightId, "light", "l", "", "ID of the light")
+	offCmd.Flags().StringVarP(&offRoomId, "room", "r", "", "ID of the room")
+	offCmd.MarkFlagsMutuallyExclusive("light", "room")
+
 	rootCmd.AddCommand(offCmd)
 }

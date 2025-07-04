@@ -5,6 +5,7 @@ type HueData struct {
 }
 
 type HueDevice struct {
+	Id       string        `json:"id"`
 	Metadata *Metadata     `json:"metadata,omitempty"`
 	Services *[]Service    `json:"services,omitempty"`
 	On       *OnState      `json:"on,omitempty"`

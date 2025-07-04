@@ -3,33 +3,35 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-	"os"
 )
 
-var onId string
+var (
+	onLightId string
+	onRoomId  string
+)
+
 var onCmd = &cobra.Command{
 	Use:   "on",
-	Short: "Turn on a light",
-	Long:  "Turn on a light",
+	Short: "Turn on a light or room",
+	Long:  "Turn on a light or room",
 	Args:  cobra.ExactArgs(0),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		id, err := cmd.Flags().GetString("id")
-		if err != nil {
-			return err
+		if onLightId == "" && onRoomId == "" {
+			return fmt.Errorf("must specify either a light or room")
 		}
 
-		fmt.Printf("Turning ON light with ID: %s\n", id)
-
-		return On(id)
+		if onLightId != "" {
+			return On(onLightId, false)
+		} else {
+			return On(onRoomId, true)
+		}
 	},
 }
 
 func init() {
-	onCmd.Flags().StringVarP(&onId, "id", "i", "", "ID of the light")
-	err := onCmd.MarkFlagRequired("id")
-	if err != nil {
-		fmt.Printf("Error marking flag as required: %s\n", err)
-		os.Exit(1)
-	}
+	onCmd.Flags().StringVarP(&onLightId, "light", "l", "", "ID of the light")
+	onCmd.Flags().StringVarP(&onRoomId, "room", "r", "", "ID of the room")
+	onCmd.MarkFlagsMutuallyExclusive("light", "room")
+
 	rootCmd.AddCommand(onCmd)
 }

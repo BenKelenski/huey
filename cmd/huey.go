@@ -106,7 +106,7 @@ func Devices(roomsFlag bool) (result []models.Device, e error) {
 	if roomsFlag {
 		url = fmt.Sprintf("https://%s/clip/v2/resource/room", os.Getenv("HUE_IP_ADDRESS"))
 	} else {
-		url = fmt.Sprintf("https://%s/clip/v2/resource/device", os.Getenv("HUE_IP_ADDRESS"))
+		url = fmt.Sprintf("https://%s/clip/v2/resource/light", os.Getenv("HUE_IP_ADDRESS"))
 	}
 
 	res, err := makeRequest("GET", url, nil)
@@ -130,11 +130,11 @@ func Devices(roomsFlag bool) (result []models.Device, e error) {
 
 	var devices []models.Device
 
-	for _, device := range response.Data {
-		for _, service := range *device.Services {
-			if (roomsFlag && service.RType == "grouped_light") || service.RType == "light" {
-				devices = append(devices, models.Device{Name: device.Metadata.Name, Type: device.Metadata.Archetype, Id: service.RID})
-			}
+	for _, data := range response.Data {
+		if roomsFlag {
+			devices = append(devices, models.Device{Name: data.Metadata.Name, Type: data.Metadata.Archetype, Id: (*data.Services)[0].RID})
+		} else {
+			devices = append(devices, models.Device{Name: data.Metadata.Name, Type: data.Metadata.Archetype, Id: data.Id})
 		}
 	}
 
@@ -168,9 +168,14 @@ func Dim(lightId string, brightness float64) (e error) {
 	return nil
 }
 
-func Off(lightId string) (e error) {
+func Off(deviceId string, isRoom bool) (e error) {
 
-	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), lightId)
+	var url string
+	if isRoom {
+		url = fmt.Sprintf("https://%s/clip/v2/resource/grouped_light/%s", os.Getenv("HUE_IP_ADDRESS"), deviceId)
+	} else {
+		url = fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), deviceId)
+	}
 
 	body := []byte(`{"on":{"on":false}}`)
 
@@ -190,9 +195,14 @@ func Off(lightId string) (e error) {
 	return nil
 }
 
-func On(lightId string) (e error) {
+func On(deviceId string, isRoom bool) (e error) {
 
-	url := fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), lightId)
+	var url string
+	if isRoom {
+		url = fmt.Sprintf("https://%s/clip/v2/resource/grouped_light/%s", os.Getenv("HUE_IP_ADDRESS"), deviceId)
+	} else {
+		url = fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), deviceId)
+	}
 
 	body := []byte(`{"on":{"on":true}}`)
 
