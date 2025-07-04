@@ -16,6 +16,9 @@ const (
 	HueAppHeader    = "hue-application-key"
 	ContentType     = "Content-Type"
 	ApplicationJson = "application/json"
+	GET             = "GET"
+	PUT             = "PUT"
+	POST            = "POST"
 )
 
 func makeRequest(method string, url string, body []byte) (response *http.Response, e error) {
@@ -84,7 +87,7 @@ func Color(lightId string, color string) (e error) {
 		return fmt.Errorf("error marshalling json for request: %s\n", err)
 	}
 
-	res, err := makeRequest("PUT", url, jsonBody)
+	res, err := makeRequest(PUT, url, jsonBody)
 
 	if err != nil {
 		return err
@@ -109,7 +112,7 @@ func Devices(roomsFlag bool) (result []models.Device, e error) {
 		url = fmt.Sprintf("https://%s/clip/v2/resource/light", os.Getenv("HUE_IP_ADDRESS"))
 	}
 
-	res, err := makeRequest("GET", url, nil)
+	res, err := makeRequest(GET, url, nil)
 
 	if err != nil {
 		return nil, err
@@ -153,7 +156,7 @@ func Dim(lightId string, brightness float64) (e error) {
 		return fmt.Errorf("error marshalling json for request to hue-api-v2 %s", err)
 	}
 
-	res, err := makeRequest("PUT", url, jsonBody)
+	res, err := makeRequest(PUT, url, jsonBody)
 
 	if err != nil {
 		return err
@@ -177,9 +180,15 @@ func Off(deviceId string, isRoom bool) (e error) {
 		url = fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), deviceId)
 	}
 
-	body := []byte(`{"on":{"on":false}}`)
+	body := models.HueDevice{On: &models.OnState{On: false}}
 
-	res, err := makeRequest("PUT", url, body)
+	jsonBody, err := json.Marshal(body)
+
+	if err != nil {
+		return fmt.Errorf("error marshalling json for request to hue-api-v2 %s", err)
+	}
+
+	res, err := makeRequest(PUT, url, jsonBody)
 
 	if err != nil {
 		return err
@@ -204,9 +213,15 @@ func On(deviceId string, isRoom bool) (e error) {
 		url = fmt.Sprintf("https://%s/clip/v2/resource/light/%s", os.Getenv("HUE_IP_ADDRESS"), deviceId)
 	}
 
-	body := []byte(`{"on":{"on":true}}`)
+	body := models.HueDevice{On: &models.OnState{On: true}}
 
-	res, err := makeRequest("PUT", url, body)
+	jsonBody, err := json.Marshal(body)
+
+	if err != nil {
+		return fmt.Errorf("error marshalling json for request to hue-api-v2 %s", err)
+	}
+
+	res, err := makeRequest(PUT, url, jsonBody)
 
 	if err != nil {
 		return err
@@ -228,7 +243,7 @@ func Register() (response []byte, e error) {
 
 	body := []byte(`{"devicetype": "huey#go_cli","generateclientkey": true}`)
 
-	res, err := makeRequest("POST", url, body)
+	res, err := makeRequest(POST, url, body)
 
 	if err != nil {
 		return nil, err
