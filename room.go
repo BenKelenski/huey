@@ -19,6 +19,10 @@ type Room struct {
 	Type     string        `json:"type"`
 }
 
+func (r Room) Title() string       { return r.Metadata.Name }
+func (r Room) Description() string { return r.Metadata.Archetype }
+func (r Room) FilterValue() string { return r.Metadata.Name }
+
 type RoomsResponse struct {
 	Errors []any  `json:"errors"`
 	Data   []Room `json:"data"`

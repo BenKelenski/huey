@@ -4,8 +4,12 @@ import (
 	"fmt"
 	"os"
 
+	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 )
+
+const listWidth = 40
+const listHeight = 20
 
 func initialModel() model {
 	rooms, err := GetRooms()
@@ -13,10 +17,17 @@ func initialModel() model {
 		fmt.Printf("error while getting rooms: %s\n", err)
 		os.Exit(1)
 	}
-	return model{
-		rooms:    rooms,
-		selected: make(map[int]struct{}),
+
+	items := make([]list.Item, len(rooms))
+	for i, r := range rooms {
+		items[i] = r
 	}
+
+	delegate := list.NewDefaultDelegate()
+	l := list.New(items, delegate, listWidth, listHeight)
+	l.Title = "Rooms"
+
+	return model{list: l}
 }
 
 func (m model) Init() tea.Cmd {
@@ -26,52 +37,18 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
+		if msg.String() == "q" || msg.String() == "ctrl+c" {
 			return m, tea.Quit
-
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-
-		case "down", "j":
-			if m.cursor < len(m.rooms)-1 {
-				m.cursor++
-			}
-
-		case "enter", "space":
-			_, ok := m.selected[m.cursor]
-			if ok {
-				delete(m.selected, m.cursor)
-			} else {
-				m.selected[m.cursor] = struct{}{}
-			}
 		}
 	}
 
-	return m, nil
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
 }
 
 func (m model) View() tea.View {
-	s := "Rooms:\n\n"
-	for i, room := range m.rooms {
-		cursor := " " // no cursor
-		if m.cursor == i {
-			cursor = ">" // cursor!
-		}
-
-		checked := " " // not selected
-		if _, ok := m.selected[i]; ok {
-			checked = "x" // selected!
-		}
-
-		s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, room.Metadata.Name)
-	}
-
-	s += "\nPress q to quit.\n"
-
-	return tea.NewView(s)
+	return tea.NewView(m.list.View())
 }
 
 func main() {

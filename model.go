@@ -1,7 +1,7 @@
 package main
 
+import "charm.land/bubbles/v2/list"
+
 type model struct {
-	rooms    []Room
-	cursor   int
-	selected map[int]struct{}
+	list list.Model
 }
