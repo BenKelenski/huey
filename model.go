@@ -10,6 +10,7 @@ type appView int
 const (
 	listView appView = iota
 	roomView
+	colorView
 )
 
 type roomsLoadedMsg struct {
@@ -18,6 +19,10 @@ type roomsLoadedMsg struct {
 }
 
 type lightSetMsg struct {
+	err error
+}
+
+type colorSetMsg struct {
 	err error
 }
 
@@ -30,5 +35,6 @@ type model struct {
 	currentView  appView
 	selectedRoom Room
 	roomCursor   int
+	colorCursor  int
 	actionMsg    string
 }

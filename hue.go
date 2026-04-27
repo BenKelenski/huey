@@ -74,6 +74,40 @@ func SetRoomLights(room Room, on bool) error {
 	return nil
 }
 
+func SetRoomColor(room Room, x, y float64) error {
+	var groupedLightID string
+	for _, s := range room.Services {
+		if s.RType == "grouped_light" {
+			groupedLightID = s.RID
+			break
+		}
+	}
+	if groupedLightID == "" {
+		return fmt.Errorf("no grouped_light service found for room %s", room.Metadata.Name)
+	}
+
+	url := fmt.Sprintf("https://%s/clip/v2/resource/grouped_light/%s", os.Getenv("HUE_IP_ADDRESS"), groupedLightID)
+	body, err := json.Marshal(map[string]any{
+		"color": map[string]any{
+			"xy": map[string]any{"x": x, "y": y},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("error marshaling request body: %s", err)
+	}
+
+	res, err := makeRequest(PUT, url, body)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
+	return nil
+}
+
 func GetRooms() ([]Room, error) {
 	url := fmt.Sprintf("https://%s/clip/v2/resource/room", os.Getenv("HUE_IP_ADDRESS"))
 

@@ -42,6 +42,13 @@ func setLight(room Room, on bool) tea.Cmd {
 	}
 }
 
+func setColor(room Room, preset ColorPreset) tea.Cmd {
+	return func() tea.Msg {
+		err := SetRoomColor(room, preset.X, preset.Y)
+		return colorSetMsg{err: err}
+	}
+}
+
 func (m model) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, fetchRooms)
 }
@@ -56,14 +63,40 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.currentView == listView {
 				return m, tea.Quit
 			}
+			if m.currentView == colorView {
+				m.currentView = roomView
+				return m, nil
+			}
 			m.currentView = listView
 			m.actionMsg = ""
 			return m, nil
 		case "esc", "backspace":
+			if m.currentView == colorView {
+				m.currentView = roomView
+				return m, nil
+			}
 			if m.currentView == roomView {
 				m.currentView = listView
 				m.actionMsg = ""
 				return m, nil
+			}
+		}
+
+		if m.currentView == colorView {
+			switch msg.String() {
+			case "up", "k":
+				if m.colorCursor > 0 {
+					m.colorCursor--
+				}
+				return m, nil
+			case "down", "j":
+				if m.colorCursor < len(colorPresets)-1 {
+					m.colorCursor++
+				}
+				return m, nil
+			case "enter", " ":
+				preset := colorPresets[m.colorCursor]
+				return m, setColor(m.selectedRoom, preset)
 			}
 		}
 
@@ -75,13 +108,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			case "down", "j":
-				if m.roomCursor < 1 {
+				if m.roomCursor < 2 {
 					m.roomCursor++
 				}
 				return m, nil
 			case "enter", " ":
-				on := m.roomCursor == 0
-				return m, setLight(m.selectedRoom, on)
+				switch m.roomCursor {
+				case 0:
+					return m, setLight(m.selectedRoom, true)
+				case 1:
+					return m, setLight(m.selectedRoom, false)
+				case 2:
+					m.colorCursor = 0
+					m.currentView = colorView
+					return m, nil
+				}
 			}
 		}
 
@@ -129,6 +170,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+
+	case colorSetMsg:
+		m.currentView = roomView
+		if msg.err != nil {
+			m.actionMsg = "error: " + msg.err.Error()
+		} else {
+			m.actionMsg = "Color set to " + colorPresets[m.colorCursor].Name
+		}
+		return m, nil
 	}
 
 	if m.loading {
@@ -151,6 +201,8 @@ func (m model) View() tea.View {
 
 	if m.loading {
 		content = fmt.Sprintf("%s Loading rooms…", m.spinner.View())
+	} else if m.currentView == colorView {
+		content = m.colorViewContent()
 	} else if m.currentView == roomView {
 		content = m.roomViewContent()
 	} else {
@@ -165,7 +217,7 @@ func (m model) View() tea.View {
 }
 
 func (m model) roomViewContent() string {
-	options := []string{"Turn On", "Turn Off"}
+	options := []string{"Turn On", "Turn Off", "Set Color"}
 	out := titleStyle.Render(m.selectedRoom.Metadata.Name) + "\n"
 
 	for i, opt := range options {
@@ -183,6 +235,23 @@ func (m model) roomViewContent() string {
 			style = errStyle
 		}
 		out += style.Render(m.actionMsg) + "\n"
+	}
+
+	out += subtleStyle.Render("↑/↓ to move • enter/space to select • esc to go back")
+	return out
+}
+
+func (m model) colorViewContent() string {
+	out := titleStyle.Render("Set Color — "+m.selectedRoom.Metadata.Name) + "\n"
+
+	for i, preset := range colorPresets {
+		swatch := lipgloss.NewStyle().Foreground(lipgloss.Color(preset.Display)).Render("■ ")
+		if i == m.colorCursor {
+			out += selectedStyle.Render("> ") + swatch + selectedStyle.Render(preset.Name)
+		} else {
+			out += normalStyle.Render("  ") + swatch + normalStyle.Render(preset.Name)
+		}
+		out += "\n"
 	}
 
 	out += subtleStyle.Render("↑/↓ to move • enter/space to select • esc to go back")
