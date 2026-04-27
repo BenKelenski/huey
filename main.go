@@ -154,7 +154,7 @@ func (m model) View() tea.View {
 	} else if m.currentView == roomView {
 		content = m.roomViewContent()
 	} else {
-		content = m.list.View()
+		content = m.list.View() + "\n" + subtleStyle.Render("enter/space to select")
 	}
 
 	centered := lipgloss.Place(m.windowWidth, m.windowHeight,
