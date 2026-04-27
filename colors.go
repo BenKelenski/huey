@@ -6,7 +6,7 @@ type ColorPreset struct {
 	Display string // lipgloss-compatible color for terminal preview
 }
 
-var colorPresets = []ColorPreset{
+var colorPresets = [...]ColorPreset{
 	{Name: "Red", X: 0.675, Y: 0.322, Display: "#FF2020"},
 	{Name: "Orange", X: 0.561, Y: 0.403, Display: "#FF8C00"},
 	{Name: "Yellow", X: 0.477, Y: 0.453, Display: "#FFE000"},
