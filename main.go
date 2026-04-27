@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/spinner"
@@ -13,6 +12,15 @@ import (
 
 const listWidth = 40
 const listHeight = 20
+
+var (
+	titleStyle    = lipgloss.NewStyle().Bold(true).MarginBottom(1)
+	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+	normalStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
+	subtleStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).MarginTop(1)
+	msgStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).MarginTop(1)
+	errStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).MarginTop(1)
+)
 
 func initialModel() model {
 	s := spinner.New(spinner.WithSpinner(spinner.Dot))
@@ -27,6 +35,13 @@ func fetchRooms() tea.Msg {
 	return roomsLoadedMsg{rooms: rooms, err: err}
 }
 
+func setLight(room Room, on bool) tea.Cmd {
+	return func() tea.Msg {
+		err := SetRoomLights(room, on)
+		return lightSetMsg{err: err}
+	}
+}
+
 func (m model) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, fetchRooms)
 }
@@ -34,12 +49,59 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
-		if msg.String() == "q" || msg.String() == "ctrl+c" {
+		switch msg.String() {
+		case "ctrl+c":
 			return m, tea.Quit
+		case "q":
+			if m.currentView == listView {
+				return m, tea.Quit
+			}
+			m.currentView = listView
+			m.actionMsg = ""
+			return m, nil
+		case "esc", "backspace":
+			if m.currentView == roomView {
+				m.currentView = listView
+				m.actionMsg = ""
+				return m, nil
+			}
 		}
+
+		if m.currentView == roomView {
+			switch msg.String() {
+			case "up", "k":
+				if m.roomCursor > 0 {
+					m.roomCursor--
+				}
+				return m, nil
+			case "down", "j":
+				if m.roomCursor < 1 {
+					m.roomCursor++
+				}
+				return m, nil
+			case "enter", " ":
+				on := m.roomCursor == 0
+				return m, setLight(m.selectedRoom, on)
+			}
+		}
+
+		if m.currentView == listView && !m.loading {
+			switch msg.String() {
+			case "enter", " ":
+				if item, ok := m.list.SelectedItem().(Room); ok {
+					m.selectedRoom = item
+					m.roomCursor = 0
+					m.actionMsg = ""
+					m.currentView = roomView
+					return m, nil
+				}
+			}
+		}
+
 	case tea.WindowSizeMsg:
 		m.windowWidth = msg.Width
 		m.windowHeight = msg.Height
+
 	case roomsLoadedMsg:
 		if msg.err != nil {
 			fmt.Printf("error while getting rooms: %s\n", msg.err)
@@ -55,6 +117,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list = l
 		m.loading = false
 		return m, nil
+
+	case lightSetMsg:
+		if msg.err != nil {
+			m.actionMsg = "error: " + msg.err.Error()
+		} else {
+			if m.roomCursor == 0 {
+				m.actionMsg = "Lights turned on"
+			} else {
+				m.actionMsg = "Lights turned off"
+			}
+		}
+		return m, nil
 	}
 
 	if m.loading {
@@ -63,23 +137,56 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	var cmd tea.Cmd
-	m.list, cmd = m.list.Update(msg)
-	return m, cmd
+	if m.currentView == listView {
+		var cmd tea.Cmd
+		m.list, cmd = m.list.Update(msg)
+		return m, cmd
+	}
+
+	return m, nil
 }
 
 func (m model) View() tea.View {
 	var content string
+
 	if m.loading {
 		content = fmt.Sprintf("%s Loading rooms…", m.spinner.View())
+	} else if m.currentView == roomView {
+		content = m.roomViewContent()
 	} else {
 		content = m.list.View()
 	}
+
 	centered := lipgloss.Place(m.windowWidth, m.windowHeight,
 		lipgloss.Center, lipgloss.Center,
 		content,
 	)
 	return tea.View{Content: centered, AltScreen: true}
+}
+
+func (m model) roomViewContent() string {
+	options := []string{"Turn On", "Turn Off"}
+	out := titleStyle.Render(m.selectedRoom.Metadata.Name) + "\n"
+
+	for i, opt := range options {
+		if i == m.roomCursor {
+			out += selectedStyle.Render("> " + opt)
+		} else {
+			out += normalStyle.Render("  " + opt)
+		}
+		out += "\n"
+	}
+
+	if m.actionMsg != "" {
+		style := msgStyle
+		if len(m.actionMsg) > 6 && m.actionMsg[:6] == "error:" {
+			style = errStyle
+		}
+		out += style.Render(m.actionMsg) + "\n"
+	}
+
+	out += subtleStyle.Render("↑/↓ to move • enter/space to select • esc to go back")
+	return out
 }
 
 func main() {
