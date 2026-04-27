@@ -22,7 +22,7 @@ var (
 	errStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).MarginTop(1)
 )
 
-func initialModel() model {
+func initializeModel() model {
 	s := spinner.New(spinner.WithSpinner(spinner.Dot))
 	return model{
 		spinner: s,
@@ -259,7 +259,7 @@ func (m model) colorViewContent() string {
 }
 
 func main() {
-	p := tea.NewProgram(initialModel())
+	p := tea.NewProgram(initializeModel())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Uh oh, there was an error: %v\n", err)
 		os.Exit(1)
